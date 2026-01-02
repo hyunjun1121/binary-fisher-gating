@@ -1,0 +1,74 @@
+% Introduction - BFG: Simple and Effective Binary Gating
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{The Problem: Storage vs.\ Accuracy Trade-off}
+
+Continual learning systems must acquire new skills without forgetting old ones---a challenge known as \emph{catastrophic forgetting} \citep{mccloskey1989catastrophic, french1999catastrophic, goodfellow2013empirical}. Existing methods fall into three categories, each with distinct trade-offs:
+
+\paragraph{Regularization Methods.}
+Elastic Weight Consolidation \citep[EWC;][]{kirkpatrick2017overcoming} adds a quadratic penalty discouraging changes to important weights:
+\begin{equation}
+\mathcal{L}_{\text{EWC}} = \mathcal{L}_{\text{task}} + \frac{\lambda}{2} \sum_i F_i (\theta_i - \theta_i^*)^2
+\label{eq:ewc}
+\end{equation}
+This requires storing both the Fisher diagonal $F$ (32 bits) and optimal parameters $\theta^*$ (32 bits)---64 bits per weight. For a network with 478K weights, this amounts to $\sim$3.7~MB of metadata.
+
+\paragraph{Subnetwork Methods.}
+PackNet~\citep{mallya2018packnet} and WSN~\citep{kang2022forget} store \emph{per-task binary masks}, achieving strong accuracy but incurring $O(T)$ storage growth. For 100 tasks on ResNet-18~\citep{he2016deep}, this requires $\sim$140~MB of masks alone.
+
+\paragraph{Replay Methods.}
+Experience Replay~\citep[ER;][]{rolnick2019experience} and DER++~\citep{buzzega2020dark} achieve state-of-the-art accuracy by storing raw training samples. However, this violates privacy constraints in regulated domains (healthcare, finance) where data retention is prohibited.
+
+\subsection{Our Contribution: Simple $O(1)$ Binary Gating}
+
+We ask: \emph{Can we achieve competitive accuracy with a single cumulative mask that scales $O(1)$ regardless of task count?}
+
+We present \textbf{Binary Fisher Gating (BFG)}, a simple yet effective parameter isolation method. After each task, BFG:
+\begin{enumerate}
+    \item Computes the diagonal Fisher Information for each weight
+    \item Identifies the top-$k\%$ most important weights via percentile thresholding
+    \item Permanently locks these weights by setting their gradients to zero
+    \item Accumulates locked weights into a single cumulative binary mask
+\end{enumerate}
+
+This closed-form approach requires \textbf{no learned masks}, \textbf{no task embeddings}, and \textbf{no replay buffers}. The only hyperparameter is the lock fraction $k$ (we use $k=0.4$ throughout).
+
+\paragraph{Key Insight: Hard Gating Provides Fundamentally Superior Protection.}
+Our experiments reveal a critical finding: the \emph{protection mechanism} matters more than storage precision. Soft regularization methods (EWC, SPG) \emph{slow} parameter drift but cannot prevent it entirely---over extended training, small updates accumulate into catastrophic forgetting (35.2\% for EWC on CIFAR-100). In contrast, BFG's hard gating ($\Delta w = 0$ for locked weights) provides \emph{complete} protection: locked weights experience exactly zero drift regardless of training duration. This explains BFG's \textbf{10$\times$ reduction in forgetting} (3.6\% vs.\ 35.2\%)---we eliminate forgetting at its source rather than merely attenuating it.
+
+\paragraph{Binary Importance is Sufficient.}
+Fisher Information is remarkably robust to quantization: reducing from 32-bit to 1-bit binary (locked/plastic) causes no measurable accuracy loss. This validates that importance \emph{rank order} matters more than magnitude---we only need to identify \emph{which} weights are important, not \emph{how} important.
+
+\subsection{Architectural Distinction: $O(1)$ vs.\ $O(T)$ Storage}
+
+A key distinction separates BFG from subnetwork methods:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Method} & \textbf{Mask Type} & \textbf{Storage} \\
+\midrule
+PackNet, WSN & Per-task & $O(T)$ \\
+SupSup~\citep{wortsman2020supermasks} & Per-task & $O(T)$ \\
+\textbf{BFG (Ours)} & \textbf{Cumulative} & $\mathbf{O(1)}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is not merely a compression improvement---it represents a fundamentally different design philosophy. Rather than allocating distinct subnetworks per task, BFG forces the model to learn a \emph{unified, drift-resistant representation} where important weights are progressively locked into a shared knowledge base. This constant memory footprint makes BFG uniquely suited for \textbf{indefinite deployment} scenarios where the number of future tasks is unbounded.
+
+\subsection{Privacy-Preserving Design}
+
+Beyond storage efficiency, BFG offers a critical advantage for privacy-sensitive domains: it requires \textbf{zero raw data storage}. Like other regularization methods (EWC, SI), BFG's binary masks contain no information about original training data---but with \textbf{64$\times$ less metadata}. This makes BFG the \emph{most storage-efficient privacy-compliant option} for deployment under:
+\begin{itemize}
+    \item \textbf{GDPR Article 17} (Right to erasure)
+    \item \textbf{HIPAA \S 164.530(c)} (Healthcare data retention limits)
+    \item \textbf{Edge devices} where storing user data locally is prohibited
+\end{itemize}
+
+\subsection{Paper Organization}
+
+Section~\ref{sec:method} presents the BFG algorithm and analyzes its design choices. Section~\ref{sec:experiments} evaluates BFG against regularization, subnetwork, and replay baselines on Permuted MNIST and Split-CIFAR-100. Section~\ref{sec:discussion} analyzes the efficiency--accuracy trade-off and discusses limitations. Section~\ref{sec:conclusion} concludes with future directions.

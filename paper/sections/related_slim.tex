@@ -1,0 +1,60 @@
+% Related Work (Expanded version with method details)
+\section{Related Work}
+\label{sec:related}
+
+Continual learning methods have been extensively surveyed and categorized into regularization-based, architecture-based, and replay-based approaches~\citep{delange2022continual}. We position BFG within this taxonomy.
+
+\paragraph{Regularization-Based Methods.}
+EWC~\citep{kirkpatrick2017overcoming} pioneered Fisher Information for importance-weighted regularization, computing a \emph{soft} penalty proportional to how much each weight deviates from its task-optimal value:
+\begin{equation}
+L_{\text{EWC}} = L_{\text{task}} + \frac{\lambda}{2} \sum_{i} F_i (\theta_i - \theta_i^*)^2
+\label{eq:ewc_loss}
+\end{equation}
+This requires storing both $F_i$ (32-bit) and $\theta_i^*$ (32-bit) per weight---64 bits total. Online EWC~\citep{schwarz2018progress} maintains a running Fisher average to avoid per-task storage growth, but still requires 32-bit continuous values. Synaptic Intelligence (SI)~\citep{zenke2017continual} computes importance online via path integrals: $\Omega_k = \sum_t \frac{\partial L}{\partial \theta_k} \cdot \Delta\theta_k$, capturing which weights actively contributed to learning. Memory Aware Synapses (MAS)~\citep{aljundi2018memory} uses output-gradient sensitivity for unsupervised importance estimation. All store \emph{continuous} importance values (32-bit); BFG reduces this to 1-bit masks while changing the protection mechanism from soft penalties to hard freezing.
+
+\paragraph{Architecture-Based Methods.}
+Recent theoretical work has begun providing formal guarantees for parameter isolation methods~\citep{lanzillotta2024towards}. PackNet~\citep{mallya2018packnet} iteratively prunes and freezes weights by magnitude:
+\begin{enumerate}
+\item Train on task $t$ for $E$ epochs
+\item Prune bottom $p\%$ of remaining weights by magnitude
+\item Retrain for $R$ epochs to recover from pruning damage
+\item Freeze surviving weights permanently
+\end{enumerate}
+This aggressive pruning ($p=50\%$ per task) leads to rapid capacity exhaustion---by Task 10, PackNet freezes 99.8\% of weights vs.\ BFG's 58.3\%. HAT~\citep{serra2018overcoming} learns per-task attention masks via gradient-based optimization, providing soft modulation rather than hard freezing. WSN~\citep{kang2022forget} uses AlexNet~\citep{krizhevsky2012imagenet} (61M parameters), achieving strong results but with $O(T)$ mask storage scaling. BFG maintains a \emph{single cumulative mask} with $O(1)$ storage. Table~\ref{tab:method_comparison} summarizes the key distinctions.
+
+\begin{table}[t]
+\caption{Comparison of parameter isolation methods for continual learning. Storage complexity refers to metadata growth with $T$ tasks; ``Hard'' gating means $\Delta w = 0$ for protected weights, while ``Soft'' allows attenuated updates. BFG uniquely combines hard gating with $O(1)$ metadata storage and Fisher-based importance.}
+\label{tab:method_comparison}
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Method} & \textbf{Storage} & \textbf{Gating} & \textbf{Importance} & \textbf{Replay?} \\
+\midrule
+EWC & $O(1)$, 64b/wt & Soft & Fisher & No \\
+Online EWC & $O(1)$, 32b/wt & Soft & Fisher (running) & No \\
+SI & $O(1)$, 64b/wt & Soft & Path integral & No \\
+PackNet & $O(T)$, 1b/wt/task & Hard & Magnitude & No \\
+HAT & $O(T)$ & Soft & Learned & No \\
+SPG & $O(1)$, 32b/wt & Soft & Gradient norm & No \\
+Soft-Fisher$^\dagger$ & $O(1)$ & Soft & Fisher & No \\
+\midrule
+\rowcolor{green!10}
+\textbf{BFG (Ours)} & $O(1)$, \textbf{1b/wt} & \textbf{Hard} & Fisher & No \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\paragraph{Soft Parameter Gating.}
+SPG~\citep{konishi2023parameter} presents an alternative to hard masking: it maintains a single accumulated importance vector with $O(1)$ storage and applies \emph{soft} gradient modulation. Unlike our naive Soft-Fisher baseline (which collapses under extended training), SPG incorporates per-layer normalization and careful importance accumulation that prevents catastrophic drift. We compare BFG against SPG in Section~\ref{sec:experiments}. While SPG achieves competitive accuracy, BFG offers two advantages: (1) simpler implementation without layer-wise normalization hyperparameters, and (2) hard guarantees that locked weights cannot drift regardless of training duration.
+
+\paragraph{Soft vs.\ Hard Gating.}
+We introduce a \textbf{Soft-Fisher baseline}$^\dagger$ that applies continuous importance-weighted attenuation to gradients, preserving differentiability for end-to-end optimization. BFG takes the opposite approach: \emph{hard binary gating} that strictly freezes important weights ($\Delta w = 0$). Our experiments show that \emph{naive} soft attenuation collapses to near-chance accuracy ($\sim$8\%), while properly-designed soft methods like SPG achieve competitive performance through careful normalization (Table~\ref{tab:soft_fisher}). This suggests that the key insight is not that soft gating is fundamentally limited, but that hard gating provides a \emph{simpler} path to strong performance without requiring layer-wise normalization hyperparameters.
+
+\paragraph{Quantized Fisher and Storage Efficiency.}
+An orthogonal approach is to quantize EWC's metadata. We systematically evaluate standard EWC with Fisher Information quantized to $\{32, 16, 8, 4, 2, 1\}$ bits. Our experiments show that quantized EWC degrades gradually---not catastrophically---with reduced precision (Figure~\ref{fig:quantization}). However, BFG at 1-bit still outperforms heavily quantized EWC, validating that the \emph{protection mechanism} (hard gating vs.\ soft penalty) provides benefit beyond storage efficiency alone.
+
+\paragraph{Replay-Based Methods.}
+iCaRL~\citep{rebuffi2017icarl}, ER~\citep{rolnick2019experience}, and DER++~\citep{buzzega2020dark} achieve strong performance via stored exemplars. BFG is orthogonal---combining BFG with small replay buffers yields gains over replay alone (Appendix~\ref{app:class_il}).

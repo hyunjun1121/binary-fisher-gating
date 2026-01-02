@@ -1,0 +1,25 @@
+% Conclusion (Expanded version)
+\section{Conclusion}
+\label{sec:conclusion}
+
+We present \textbf{Binary Fisher Gating (BFG)}, a privacy-preserving continual learning method that compresses EWC's dense Fisher matrix into a 1-bit binary mask. Our key contributions:
+\begin{enumerate}
+    \item \textbf{Adaptive Percentile Gating}: A closed-form method that identifies the top-$k\%$ important weights via Fisher Information and locks them via hard gradient masking ($\Delta w = 0$).
+    \item \textbf{64$\times$ Storage Reduction}: We replace EWC's 64-bit metadata (Fisher + reference weights) with 1-bit masks while maintaining $O(1)$ storage complexity.
+    \item \textbf{Privacy-First Design}: Like other regularization methods (EWC, SI), BFG stores \emph{zero raw data}---but with \textbf{64$\times$ less metadata}. This makes BFG the most storage-efficient privacy-compliant option for edge deployment.
+\end{enumerate}
+
+\paragraph{Key Scientific Insights.}
+Beyond the practical contribution, our experiments reveal important principles:
+\begin{itemize}
+    \item \textbf{Naive soft gating fails}: Simple gradient attenuation collapses under extended training, regardless of importance precision.
+    \item \textbf{Sophisticated soft methods work}: SPG~\citep{konishi2023parameter} achieves competitive performance through careful per-layer normalization, demonstrating that soft gating is not fundamentally limited.
+    \item \textbf{Hard gating is simpler}: BFG provides a robust baseline that works without hyperparameter tuning, at 32$\times$ less storage than SPG.
+    \item \textbf{Natural feature hierarchy}: Global thresholding achieves comparable or better performance than per-layer thresholding because it respects the importance distribution across layers.
+\end{itemize}
+
+\paragraph{Positioning BFG.}
+On Split-CIFAR-100 (50 epochs/task), BFG achieves competitive accuracy with tuned EWC while using \textbf{64$\times$ less storage}. This demonstrates that hard gating via binary masks provides an attractive accuracy-storage trade-off. For privacy-sensitive edge deployment (healthcare, finance, personal devices) where raw data cannot be stored, BFG offers the most storage-efficient option among regularization-based methods.
+
+\paragraph{Future Work.}
+Promising directions include: (1) scaling to ImageNet and larger vision benchmarks, (2) per-layer adaptive lock fractions learned end-to-end, (3) combining BFG with knowledge distillation for improved accuracy, (4) theoretical bounds relating Fisher threshold to forgetting guarantees, and (5) extension to transformer architectures for continual NLP.

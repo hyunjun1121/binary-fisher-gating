@@ -1,0 +1,38 @@
+% Discussion (Expanded version)
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{Strengths.}
+BFG excels at retaining learned mappings across tasks with hard guarantees---locked weights cannot be modified, eliminating gradual drift. The 64$\times$ storage reduction suits edge deployment, and binary masks enable efficient bitwise operations. BFG requires only one hyperparameter ($k$) with intuitive interpretation: the fraction of weights to protect per task.
+
+\paragraph{The Hard Gating Advantage.}
+Our experiments demonstrate that soft gradient attenuation fundamentally fails under extended training. The mathematical intuition is clear: even with importance 0.99, gradients of $0.01 \times g$ accumulate over 50 epochs $\times$ 10 tasks to cause significant drift. This explains why EWC achieves only 49.3\% accuracy with 35.2\% forgetting despite careful tuning---the regularization penalty \emph{slows} drift but cannot \emph{prevent} it. Similarly, SPG's sophisticated per-layer normalization provides no protection (41.3\% accuracy, 46.8\% forgetting).
+
+BFG's advantage is \emph{absolute protection}: hard gating ($\Delta w = 0$) ensures locked weights experience exactly zero drift regardless of training duration. This explains the 10$\times$ forgetting reduction (3.6\% vs.\ 35.2\%)---we eliminate forgetting at its source rather than merely attenuating it.
+
+\paragraph{When Does Hard Gating Matter?}
+Our results reveal that the gap between BFG and soft methods \emph{widens} with longer training. With 50 epochs per task (realistic for production deployment), EWC achieves only 49.3\% despite careful regularization. In short-training regimes (e.g., 5 epochs/task), soft methods may appear adequate because drift has less time to accumulate. However, in production settings where models are trained thoroughly on each task, binary gating becomes essential---not merely preferable. This has practical implications: practitioners should evaluate continual learning methods under realistic training durations, not artificially short schedules that mask the cumulative drift problem.
+
+\paragraph{The Storage Advantage is Secondary.}
+While BFG's 64$\times$ storage reduction (1 bit vs.\ 64 bits per weight) is valuable for edge deployment, our experiments reveal that the \emph{protection mechanism} provides the primary benefit. Even with unlimited storage, hard gating would remain superior to soft regularization for long-horizon continual learning. The storage efficiency is a bonus that makes BFG uniquely suited for privacy-constrained scenarios (GDPR, HIPAA), but the fundamental contribution is demonstrating that binary importance suffices for protection---we only need to identify \emph{which} weights matter, not \emph{how much} they matter.
+
+\paragraph{Why 1-Bit Suffices: Structure Over Precision.}
+Our quantized EWC experiments (Figure~\ref{fig:quantization}) show that standard EWC degrades \emph{gradually} with reduced Fisher precision---from 69.3\% at 32-bit to approximately 58\% at 1-bit. This demonstrates that Fisher Information can tolerate significant compression, though not without cost. The key insight is that BFG at 1-bit \emph{still outperforms} heavily quantized EWC, suggesting that the protection mechanism (hard gating) provides benefit beyond compression alone. Since BFG only needs to identify the top-$k\%$ most important weights for binary locking, the relative ranking of Fisher values matters more than their precise magnitudes.
+
+\paragraph{The Feature Hierarchy Emerges Naturally.}
+Our global vs.\ per-layer thresholding comparison (Table~\ref{tab:thresholding}) validates a key design choice. Global thresholding achieves comparable or better accuracy than per-layer thresholding because it \emph{respects the natural feature hierarchy}: early convolutional layers have higher Fisher values (more important per-parameter) and should be locked more aggressively (up to 100\%), while later fully-connected layers retain plasticity (as low as 32\% locked). Per-layer thresholding artificially forces uniform locking rates, ignoring this structure.
+
+\paragraph{Limitations.}
+BFG (like EWC) is designed for \emph{feedforward classification}. It does not preserve temporal dynamics, recurrent trajectories, or working memory---tasks requiring these patterns need fundamentally different approaches. Our evaluation focuses on Task-IL; Class-IL scenarios require combining BFG with replay (Appendix~\ref{app:class_il}). Scaling to larger benchmarks (ImageNet) remains future work.
+
+\paragraph{Baseline Performance Context.}
+Our EWC achieves 49.3\% on Split-CIFAR-100, which may appear lower than some reported results in the literature. This reflects our rigorous 50 epochs/task training protocol, which provides sufficient training to expose soft regularization's cumulative drift problem. We verified our implementation against the original codebase; the performance difference arises from training duration, not implementation errors. Short-training evaluations (5--10 epochs/task) mask the drift problem by not allowing sufficient time for small updates to accumulate. Our setting is more representative of practical deployment where models are trained thoroughly on each task.
+
+\paragraph{Storage Efficiency for Edge Deployment.}
+BFG occupies a unique point in the accuracy-storage-privacy space: zero raw data storage with competitive accuracy at minimal metadata cost. In privacy-constrained scenarios (GDPR, HIPAA), replay methods storing raw data may be prohibited. While EWC and SI are also privacy-compliant (no raw data), BFG requires \textbf{64$\times$ less metadata}. We do not claim formal privacy guarantees (e.g., differential privacy bounds or resistance to model inversion), but BFG's minimal metadata footprint reduces the attack surface compared to methods storing continuous importance values. For edge devices with strict storage constraints (healthcare wearables, mobile applications, IoT sensors), BFG provides a practical solution.
+
+\paragraph{Architecture Independence.}
+BFG's advantages are orthogonal to backbone choice. Our lightweight CNN (1.1M params) evaluation is directly relevant to edge deployment. For larger backbones, storage savings scale: ResNet-50~\citep{he2016deep} saves 94.6~MB vs.\ EWC (Table~\ref{tab:storage_complete}). The core insight---Fisher Information identifies functionally important weights---is architecture-independent. Practitioners can apply BFG to any differentiable architecture with gradient access.
+
+\paragraph{Capacity Management.}
+Our 20-task saturation analysis (Table~\ref{tab:saturation_app}) reveals BFG's capacity dynamics. With $k=0.4$, the network reaches $\sim$90\% locked by Task 10, after which new task learning becomes constrained. Three strategies extend capacity: (1) \textbf{Lower $k$}: using $k=0.2$ extends capacity at the cost of increased forgetting; (2) \textbf{Larger backbone}: capacity scales linearly with parameters---ResNet-50 supports more tasks than our lightweight CNN; (3) \textbf{Selective unlocking}: periodically unlocking low-importance weights (future work) could reclaim capacity. The graceful degradation pattern (accuracy declines smoothly rather than collapsing) provides predictable behavior for practitioners planning task sequences.

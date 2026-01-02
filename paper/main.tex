@@ -1,0 +1,133 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Binary Fisher Gating: Compressing EWC for Efficient Continual Learning
+% arXiv Preprint Version
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% ICML 2026 style - PREPRINT mode
+\usepackage[preprint]{icml2026}
+
+% Standard packages
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{colortbl}  % For \rowcolor
+
+% Symbols
+\usepackage{pifont}    % For \ding checkmarks
+\usepackage{xcolor}    % For colors
+
+% Algorithms
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% Graphics
+\usepackage{graphicx}
+\usepackage{subcaption}
+
+% Plotting
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% References
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{url}
+
+% PDF metadata
+\hypersetup{
+    pdfauthor={Hyunjun Kim},
+    pdftitle={Binary Fisher Gating: Compressing Elastic Weight Consolidation for Efficient Continual Learning},
+    pdfsubject={Continual Learning, Neural Networks},
+    pdfkeywords={continual learning, catastrophic forgetting, neural networks},
+    hidelinks
+}
+
+% Math operators
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\Quantile}{Quantile}
+
+% Custom commands
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\I}{\mathbb{I}}
+
+% Title running header
+\icmltitlerunning{Binary Fisher Gating for Efficient Continual Learning}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Binary Fisher Gating: Compressing Elastic Weight Consolidation \\
+           for Efficient Continual Learning}
+
+\begin{icmlauthorlist}
+\icmlauthor{Hyunjun Kim}{kaist}
+\end{icmlauthorlist}
+
+% Affiliation (must come after icmlauthorlist)
+\icmlaffiliation{kaist}{School of Computing, KAIST, Daejeon, South Korea}
+
+\icmlcorrespondingauthor{Hyunjun Kim}{hyunjun1121@kaist.ac.kr}
+
+\icmlkeywords{Continual Learning, Catastrophic Forgetting, Fisher Information,
+              Weight Importance, Memory Efficiency}
+
+\vskip 0.3in
+]
+
+% Print affiliations
+\printAffiliationsAndNotice{}
+
+%==============================================================================
+% ABSTRACT
+%==============================================================================
+\input{sections/abstract}
+
+%==============================================================================
+% MAIN TEXT (8 pages limit)
+%==============================================================================
+
+% Section 1: Introduction
+\input{sections/intro}
+
+% Section 2: Method
+\input{sections/method}
+
+% Section 3: Experiments (Slim version for 8-page limit)
+\input{sections/experiments_slim}
+
+% Section 4: Related Work (Slim version)
+\input{sections/related_slim}
+
+% Section 5: Discussion (Slim version)
+\input{sections/discussion_slim}
+
+% Section 6: Conclusion (Slim version)
+\input{sections/conclusion_slim}
+
+%==============================================================================
+% ACKNOWLEDGEMENTS
+%==============================================================================
+% \section*{Acknowledgements}
+% We thank...
+
+%==============================================================================
+% REFERENCES (unlimited pages)
+%==============================================================================
+\bibliography{references}
+\bibliographystyle{icml2026}
+
+%==============================================================================
+% APPENDIX (unlimited pages)
+%==============================================================================
+\input{sections/appendix}
+
+\end{document}

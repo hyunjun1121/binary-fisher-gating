@@ -1,0 +1,8 @@
+% Abstract - BFG: Simple and Effective Binary Gating
+\begin{abstract}
+Continual learning methods face a fundamental tension between \emph{stability} (retaining prior knowledge) and \emph{plasticity} (learning new tasks). Existing approaches either store continuous importance weights per parameter (EWC, SI) or maintain per-task binary masks (PackNet, WSN)---incurring $O(1)$ or $O(T)$ storage respectively for $T$ tasks.
+
+We present \textbf{Binary Fisher Gating (BFG)}, a simple yet effective parameter isolation method that achieves $O(1)$ storage with a \textbf{single cumulative 1-bit mask}. BFG identifies the top-$k\%$ most important weights using Fisher Information after each task and permanently locks them via hard gradient masking ($\Delta w = 0$). This closed-form approach requires no hyperparameter tuning beyond the lock fraction $k$, making it significantly simpler than learned mask methods (HAT, PackNet).
+
+On Split-CIFAR-100 (10 tasks, 50 epochs/task), BFG achieves \textbf{68.8\%} accuracy with only \textbf{3.6\% forgetting}---dramatically outperforming EWC (49.3\%, 35.2\% forgetting) and SPG (41.3\%, 46.8\% forgetting). This \textbf{10$\times$ reduction in forgetting} demonstrates that hard binary gating provides fundamentally stronger protection than soft regularization: locked weights experience \emph{zero} drift, eliminating forgetting at its source. On Split-TinyImageNet, BFG maintains this advantage (38.8\% vs.\ 24.7\% for EWC). Requiring only \textbf{1 bit per weight} (64$\times$ less than EWC), BFG is ideally suited for privacy-compliant edge deployment under strict storage constraints.
+\end{abstract}

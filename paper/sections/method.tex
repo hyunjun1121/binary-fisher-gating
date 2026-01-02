@@ -1,0 +1,126 @@
+% Method - BFG: Simple and Effective Binary Gating
+\section{Method: Binary Fisher Gating}
+\label{sec:method}
+
+We present Binary Fisher Gating (BFG), a simple yet effective parameter isolation method for continual learning that achieves $O(1)$ storage complexity regardless of task count.
+
+\subsection{Algorithm Overview}
+
+Binary Fisher Gating operates in alternating \emph{wake} (learning) and \emph{sleep} (consolidation) phases. Algorithm~\ref{alg:bfg} presents the complete procedure.
+
+\begin{algorithm}[tb]
+\caption{Binary Fisher Gating (BFG)}
+\label{alg:bfg}
+\begin{algorithmic}[1]
+\REQUIRE Network parameters $\theta$, lock fraction $k$, task sequence $\mathcal{T}_1, \ldots, \mathcal{T}_T$
+\STATE Initialize mask $M \leftarrow \mathbf{0}$ \COMMENT{All weights plastic}
+\FOR{each task $t = 1, \ldots, T$}
+    \STATE \textbf{// WAKE PHASE: Train on task $t$}
+    \FOR{each training step}
+        \STATE Compute gradient $g \leftarrow \nabla_\theta \mathcal{L}_t$
+        \IF{$t > 1$}
+            \STATE $g \leftarrow g \odot (1 - M)$ \COMMENT{Mask locked weights}
+        \ENDIF
+        \STATE Update $\theta \leftarrow \theta - \eta \cdot g$
+    \ENDFOR
+    \STATE \textbf{// SLEEP PHASE: Consolidate via Percentile Masking}
+    \STATE Compute Fisher: $F_i \leftarrow \mathbb{E}\left[\left(\frac{\partial \mathcal{L}}{\partial \theta_i}\right)^2\right]$
+    \STATE Compute threshold: $\tau \leftarrow \text{Percentile}(F, 100-k)$
+    \STATE Compute new mask: $M_{\text{new}} \leftarrow \mathbb{I}(F > \tau)$
+    \STATE Update mask: $M \leftarrow M \lor M_{\text{new}}$ \COMMENT{Monotonic union}
+\ENDFOR
+\STATE \textbf{return} Trained parameters $\theta$, final mask $M$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Fisher Information as Importance Metric}
+
+The core insight is that Fisher Information identifies weights critical for task performance. For a trained network, the diagonal Fisher Information is:
+\begin{equation}
+F_i = \mathbb{E}_{(x,y) \sim \mathcal{D}} \left[\left(\frac{\partial \log p(y | x, \theta)}{\partial \theta_i}\right)^2\right]
+\label{eq:fisher}
+\end{equation}
+
+We use the \textbf{SAMPLE} Fisher variant, which samples $\tilde{y} \sim p(y|x,\theta)$ rather than using true labels. This provides a more accurate importance estimate for the learned representation.
+
+\paragraph{Key Insight: Binary Suffices.}
+Our ablation studies (Section~\ref{sec:experiments}) reveal a surprising result: reducing Fisher Information from 32-bit continuous values to 1-bit binary (locked/plastic) causes \emph{no measurable accuracy loss}. This validates that importance \emph{rank order} matters more than magnitude---we only need to identify \emph{which} weights are important, not \emph{how} important.
+
+\subsection{Percentile Thresholding}
+
+We identify important weights using a simple percentile threshold:
+\begin{equation}
+M_{\text{new}} = \mathbb{I}(F_i > \text{Percentile}(F, 100-k))
+\label{eq:percentile}
+\end{equation}
+
+where $k$ is the lock fraction (we use $k=0.4$ throughout). This approach:
+\begin{itemize}
+    \item Requires no hyperparameter tuning beyond $k$
+    \item Is computed in closed form (no gradient descent on masks)
+    \item Naturally handles varying Fisher magnitudes across layers
+\end{itemize}
+
+\paragraph{Global vs.\ Per-Layer Thresholding.}
+We compute the percentile threshold across all layers jointly rather than per-layer. This respects the natural feature hierarchy: early convolutional layers tend to have higher Fisher values (more globally important) and are thus preferentially locked, while later layers retain more plasticity.
+
+\subsection{Monotonic Mask Accumulation}
+
+The mask grows monotonically via logical OR:
+\begin{equation}
+M^{(t)} = M^{(t-1)} \lor M_{\text{new}}^{(t)}
+\label{eq:monotonic}
+\end{equation}
+
+Once a weight is locked for Task~1, it remains locked for all future tasks. This provides:
+\begin{itemize}
+    \item \textbf{Strict gradient isolation}: Locked weights receive exactly zero gradient
+    \item \textbf{Monotonic protection}: Knowledge cannot be ``un-learned''
+    \item \textbf{Predictable capacity}: Lock fraction grows sub-linearly due to overlap
+\end{itemize}
+
+\paragraph{Cumulative Lock Growth.}
+The locked fraction after $T$ tasks follows:
+\begin{equation}
+\text{Locked}^{(T)} \approx 1 - (1 - k)^T
+\label{eq:cumulative_lock}
+\end{equation}
+However, empirically we observe sub-linear growth due to substantial overlap in Fisher-important weights across tasks. For example, with $k=0.4$, we reach $\sim$92\% locked at $T=10$ vs.\ the theoretical 99.9\%.
+
+\subsection{Storage Complexity Analysis}
+
+\begin{table}[t]
+\caption{Storage comparison for a network with $d$ parameters across $T$ tasks.}
+\label{tab:storage}
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Method} & \textbf{Per-Weight} & \textbf{Total} & \textbf{Scaling} \\
+\midrule
+EWC & 64 bits & $64d$ bits & $O(1)$ \\
+PackNet/WSN & 1 bit/task & $Td$ bits & $O(T)$ \\
+GPM~\citep{saha2021gradient} & $k$ floats/task & $32kTd$ bits & $O(T)$ \\
+\midrule
+\textbf{BFG (Ours)} & \textbf{1 bit} & $d$ bits & $\mathbf{O(1)}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:storage} compares storage requirements. BFG achieves:
+\begin{itemize}
+    \item \textbf{64$\times$ compression} vs.\ EWC (1-bit vs.\ 64-bit)
+    \item \textbf{$O(1)$ scaling} vs.\ per-task mask methods ($O(T)$)
+\end{itemize}
+
+For our 4-layer CNN ($\sim$1.1M parameters), BFG requires only \textbf{140 KB} total, regardless of task count. This enables deployment on memory-constrained edge devices where EWC's 8.9 MB overhead is prohibitive.
+
+\subsection{Implementation Details}
+
+\paragraph{Architecture.}
+We use a 4-layer CNN with channels $[32, 64, 128, 256]$, each followed by BatchNorm, ReLU, and $2\times2$ MaxPool. The classifier head uses task-specific output layers (multi-head for Task-IL).
+
+\paragraph{Training.}
+All experiments use SGD with momentum 0.9, learning rate 0.01, weight decay $10^{-4}$, and 50 epochs per task. The lock fraction is fixed at $k=0.4$ throughout.
+
+\paragraph{Fisher Computation.}
+After each task, we compute diagonal Fisher using 1000 samples from the training set with the SAMPLE variant (model-sampled labels).
